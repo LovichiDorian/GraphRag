@@ -6,6 +6,6 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/lovichidorian/graphrag-api
-    newTag: latest
+    newTag: sha-2da8b5a
   - name: ghcr.io/lovichidorian/graphrag-web
-    newTag: latest
+    newTag: sha-2da8b5a
