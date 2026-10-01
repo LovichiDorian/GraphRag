@@ -1,0 +1,49 @@
+# One-click (re)install on the k3s server over SSH — handy from a phone.
+# Required repository secrets: SSH_PRIVATE_KEY, GEMINI_API_KEY.
+# Optional: GITHUB_READ_TOKEN (GitHub API limits), variables SSH_HOST / SSH_USER.
+name: Bootstrap cluster
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: How images reach the cluster
+        type: choice
+        options: [gitops, local-build]
+        default: gitops
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      SSH_HOST: ${{ vars.SSH_HOST || '89.168.33.236' }}
+      SSH_USER: ${{ vars.SSH_USER || 'ubuntu' }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+      - name: Run deploy/scripts/install.sh on the server
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_READ_TOKEN: ${{ secrets.GITHUB_READ_TOKEN }}
+        run: |
+          target="$SSH_USER@$SSH_HOST"
+          ssh_opts=(-i ~/.ssh/id_deploy -o BatchMode=yes)
+          # Secrets travel over stdin into a 0600 file, never on a command line.
+          printf 'GEMINI_API_KEY=%s\nGITHUB_TOKEN=%s\n' "$GEMINI_API_KEY" "$GITHUB_READ_TOKEN" \
+            | ssh "${ssh_opts[@]}" "$target" 'umask 077; cat > /tmp/graphrag.env'
+          flag=""
+          [[ "${{ inputs.mode }}" == "local-build" ]] && flag="--local-build"
+          # shellcheck disable=SC2029 # $flag is meant to expand on the runner
+          ssh "${ssh_opts[@]}" "$target" "sudo ENV_FILE=/tmp/graphrag.env bash -s -- $flag" < deploy/scripts/install.sh
+          ssh "${ssh_opts[@]}" "$target" 'rm -f /tmp/graphrag.env'

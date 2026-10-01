@@ -1,0 +1,11 @@
+# Production overlay tracked by Argo CD. CI rewrites the image tags below on
+# every release (immutable sha-* tags) and commits — that commit *is* the deploy.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/lovichidorian/graphrag-api
+    newTag: latest
+  - name: ghcr.io/lovichidorian/graphrag-web
+    newTag: latest

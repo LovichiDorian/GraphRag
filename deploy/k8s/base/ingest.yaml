@@ -1,0 +1,143 @@
+# Knowledge-graph ingestion: re-runs after every Argo CD sync (PostSync hook)
+# and every night, so new GitHub activity reaches the graph automatically.
+# The PVC keeps the content-addressed LLM/embedding cache between runs.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: graphrag-cache
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: graphrag-ingest
+  labels:
+    app.kubernetes.io/name: graphrag-ingest
+    app.kubernetes.io/component: ingest
+spec:
+  schedule: "17 3 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: graphrag-ingest
+            app.kubernetes.io/component: ingest
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: ingest
+              image: ghcr.io/lovichidorian/graphrag-api:latest
+              command: ["careergraph-ingest"]
+              envFrom:
+                - configMapRef:
+                    name: graphrag-config
+                - secretRef:
+                    name: graphrag-secrets
+              env:
+                - name: CACHE_DIR
+                  value: /cache
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 1Gi
+              securityContext:
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: cache
+                  mountPath: /cache
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: cache
+              persistentVolumeClaim:
+                claimName: graphrag-cache
+            - name: tmp
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: graphrag-ingest-sync
+  labels:
+    app.kubernetes.io/name: graphrag-ingest
+    app.kubernetes.io/component: ingest
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: graphrag-ingest
+        app.kubernetes.io/component: ingest
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ingest
+          image: ghcr.io/lovichidorian/graphrag-api:latest
+          command: ["careergraph-ingest"]
+          envFrom:
+            - configMapRef:
+                name: graphrag-config
+            - secretRef:
+                name: graphrag-secrets
+          env:
+            - name: CACHE_DIR
+              value: /cache
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: cache
+              mountPath: /cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: graphrag-cache
+        - name: tmp
+          emptyDir: {}

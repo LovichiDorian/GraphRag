@@ -1,0 +1,56 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: graphrag-web
+  annotations:
+    # Only this Ingress requests the certificate; graphrag-api reuses the secret.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: graphrag-redirect-https@kubernetescrd,graphrag-security-headers@kubernetescrd,graphrag-compress@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - graphrag.dorianlovichi.com
+      secretName: graphrag-tls
+  rules:
+    - host: graphrag.dorianlovichi.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: graphrag-web
+                port:
+                  name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: graphrag-api
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: graphrag-redirect-https@kubernetescrd,graphrag-security-headers@kubernetescrd,graphrag-api-ratelimit@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - graphrag.dorianlovichi.com
+      secretName: graphrag-tls
+  rules:
+    - host: graphrag.dorianlovichi.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: graphrag-api
+                port:
+                  name: http
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: graphrag-api
+                port:
+                  name: http

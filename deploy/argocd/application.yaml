@@ -1,0 +1,30 @@
+# GitOps: Argo CD keeps the cluster in sync with deploy/k8s/overlays/prod on main.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: graphrag
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/LovichiDorian/GraphRag.git
+    targetRevision: main
+    path: deploy/k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: graphrag
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m
