@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.10
 # Build context: apps/web
 
-FROM node:24-alpine AS deps
+FROM node:26-alpine AS deps
 RUN corepack enable
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
@@ -15,7 +15,7 @@ ARG API_INTERNAL_URL=http://localhost:8000
 ENV API_INTERNAL_URL=${API_INTERNAL_URL}
 RUN pnpm build
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 LABEL org.opencontainers.image.title="careergraph-web" \
       org.opencontainers.image.description="Next.js 16 frontend of the career knowledge graph" \
       org.opencontainers.image.source="https://github.com/LovichiDorian/GraphRag" \
