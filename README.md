@@ -172,7 +172,8 @@ The production setup is a single-node k3s cluster managed with GitOps:
 
    …or run the **Bootstrap cluster** workflow from the Actions tab (secrets `SSH_PRIVATE_KEY` and
    `GEMINI_API_KEY`, optional variables `SSH_HOST` / `SSH_USER`). `--local-build` builds the images on
-   the server instead of pulling them from GHCR.
+   the server instead of pulling them from GHCR; `--diagnose` (or the workflow's `diagnose` mode) prints
+   a read-only report: pods, ingress, certificate, firewall, recent logs and HTTP checks.
 3. **Ship** — every push to `main` runs CI, builds signed multi-arch images, commits the new tags to
    `deploy/k8s/overlays/prod`, and Argo CD rolls the deployments and re-runs the ingestion job.
    A nightly CronJob picks up new GitHub activity.

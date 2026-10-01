@@ -23,6 +23,7 @@
 #   GHCR_TOKEN       optional, read:packages token if the GHCR packages are private
 #   ENV_FILE         file with KEY=value lines to load (used by the GitHub Action)
 #   --local-build    build images locally instead of pulling them from GHCR
+#   --diagnose       read-only status report (pods, ingress, TLS, firewall, logs)
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -39,6 +40,7 @@ MODE="gitops"
 for arg in "$@"; do
   case "$arg" in
     --local-build) MODE="local" ;;
+    --diagnose) MODE="diagnose" ;;
     -h | --help) sed -n '2,30p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
@@ -59,19 +61,102 @@ die() { echo "  ${red}✗ $*${reset}" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "run as root (pipe into 'sudo bash')"
 
+if command -v kubectl >/dev/null 2>&1; then KUBECTL=(kubectl); else KUBECTL=(k3s kubectl); fi
+export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+k() { "${KUBECTL[@]}" "$@"; }
+
+# Checks the site through Traefik (TLS included) from this host, without depending on DNS:
+# the request goes to Traefik's ClusterIP, or to localhost if Traefik is installed elsewhere.
+probe() {
+  local ip
+  ip=$(k -n kube-system get svc traefik -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
+  curl -sS -o /dev/null -m 10 -w '%{http_code}' --resolve "${DOMAIN}:${2:-443}:${ip:-127.0.0.1}" "$1" 2>/dev/null || true
+}
+
+# ── Read-only report, for troubleshooting (no secrets are printed) ────────────
+if [[ "$MODE" == "diagnose" ]]; then
+  section() { echo; echo "${bold}── $* ──${reset}"; }
+  section "Host"
+  uname -srm; nproc; free -h 2>/dev/null | head -2; df -h / 2>/dev/null | tail -1
+  section "Listening on 80/443"
+  ss -ltnp 2>/dev/null | grep -E ':(80|443) ' || echo "nothing"
+  section "Firewall (iptables INPUT / FORWARD)"
+  iptables -S INPUT 2>/dev/null | head -20 || true
+  iptables -S FORWARD 2>/dev/null | head -12 || true
+  section "Cluster"
+  k get nodes -o wide 2>&1 || true
+  k get ingressclass 2>&1 || true
+  k -n kube-system get pods -o wide 2>&1 | grep -Ei 'traefik|svclb|coredns|NAME' || true
+  section "graphrag"
+  k -n "$NAMESPACE" get pods,svc,ingress,pvc -o wide 2>&1 || true
+  k -n "$NAMESPACE" get certificate,certificaterequest,order,challenge 2>&1 || true
+  section "Argo CD"
+  k -n argocd get applications -o wide 2>&1 || true
+  k -n argocd get application graphrag -o jsonpath='{range .status.conditions[*]}{.type}: {.message}{"\n"}{end}' 2>/dev/null || true
+  section "Recent warnings"
+  k -n "$NAMESPACE" get events --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -25 || true
+  section "Logs: api"
+  k -n "$NAMESPACE" logs deploy/graphrag-api --tail=40 2>&1 || true
+  section "Logs: latest ingestion"
+  k -n "$NAMESPACE" logs -l app.kubernetes.io/component=ingest --tail=40 --prefix 2>&1 | tail -40 || true
+  section "HTTP checks through Traefik on this host"
+  echo "http  → $(probe "http://${DOMAIN}/" 80)"
+  echo "https → $(probe "https://${DOMAIN}/")  (000 = TLS not ready or route missing)"
+  echo "api   → $(probe "https://${DOMAIN}/api/stats")"
+  exit 0
+fi
+
 # ── 1. k3s ────────────────────────────────────────────────────────────────────
 step "Kubernetes (k3s)"
 if ! command -v k3s >/dev/null 2>&1 && ! command -v kubectl >/dev/null 2>&1; then
   curl -sfL https://get.k3s.io | sh -
   ok "k3s installed"
+  if command -v kubectl >/dev/null 2>&1; then KUBECTL=(kubectl); else KUBECTL=(k3s kubectl); fi
 fi
-if command -v kubectl >/dev/null 2>&1; then KUBECTL=(kubectl); else KUBECTL=(k3s kubectl); fi
-export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
-k() { "${KUBECTL[@]}" "$@"; }
 k wait --for=condition=Ready node --all --timeout=180s >/dev/null
 ok "cluster ready: $(k get nodes -o jsonpath='{.items[*].metadata.name}') ($(k version -o json 2>/dev/null | grep -o '"gitVersion": *"[^"]*"' | tail -1 | cut -d'"' -f4))"
 arch=$(k get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')
 ok "node architecture: $arch (images are published for amd64 and arm64)"
+mem_mb=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)
+if ((mem_mb < 3500)); then
+  warn "only ${mem_mb} MB of RAM: Neo4j + API + web + Argo CD want ~3 GB (consider --local-build, which skips Argo CD)"
+else
+  ok "memory: ${mem_mb} MB"
+fi
+if k get ingressclass traefik >/dev/null 2>&1; then
+  ok "ingress controller: Traefik"
+else
+  warn "no 'traefik' IngressClass found — this app's Ingresses and Middlewares target Traefik (the k3s default)"
+fi
+
+# Oracle Cloud (and some other) images ship iptables rules that reject everything
+# except SSH: open HTTP/HTTPS and let pod traffic through, then persist the rules.
+if command -v iptables >/dev/null 2>&1; then
+  changed=""
+  if iptables -S INPUT 2>/dev/null | grep -q -- '-j REJECT'; then
+    for port in 80 443; do
+      if ! iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
+        iptables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT
+        changed=1
+      fi
+    done
+  fi
+  if iptables -S FORWARD 2>/dev/null | grep -q -- '-j REJECT'; then
+    for cidr in 10.42.0.0/16 10.43.0.0/16; do
+      for dir in -s -d; do
+        if ! iptables -C FORWARD "$dir" "$cidr" -j ACCEPT 2>/dev/null; then
+          iptables -I FORWARD 1 "$dir" "$cidr" -j ACCEPT
+          changed=1
+        fi
+      done
+    done
+  fi
+  if [[ -n "$changed" ]]; then
+    command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save >/dev/null 2>&1 || true
+    ok "host firewall: opened 80/443 and pod forwarding (REJECT rules were present)"
+  fi
+fi
+warn "cloud firewall: ports 80 and 443 must also be open to the internet (Oracle Cloud: VCN security list)"
 
 # ── 2. namespace + secrets ────────────────────────────────────────────────────
 step "Namespace and secrets"
@@ -215,6 +300,30 @@ EOF
   k -n "$NAMESPACE" rollout status deploy/graphrag-api --timeout=300s >/dev/null
   k -n "$NAMESPACE" rollout status deploy/graphrag-web --timeout=300s >/dev/null
   cd /; rm -rf "$workdir"
+fi
+
+# ── Verification ──────────────────────────────────────────────────────────────
+step "Verification"
+for _ in $(seq 1 36); do
+  [[ "$(k -n "$NAMESPACE" get certificate graphrag-tls -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" == "True" ]] && break
+  sleep 5
+done
+if [[ "$(k -n "$NAMESPACE" get certificate graphrag-tls -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" == "True" ]]; then
+  ok "TLS certificate issued by Let's Encrypt"
+else
+  warn "TLS certificate not ready yet — Let's Encrypt must reach http://${DOMAIN}/.well-known/acme-challenge/ (DNS + port 80)"
+  k -n "$NAMESPACE" get challenge -o custom-columns=DOMAIN:.spec.dnsName,STATE:.status.state,REASON:.status.reason 2>/dev/null | sed 's/^/    /' || true
+fi
+for _ in $(seq 1 30); do
+  [[ "$(probe "https://${DOMAIN}/api/stats")" == "200" ]] && break
+  sleep 10
+done
+web_code=$(probe "https://${DOMAIN}/")
+api_code=$(probe "https://${DOMAIN}/api/stats")
+if [[ "$web_code" == "200" && "$api_code" == "200" ]]; then
+  ok "https://${DOMAIN} answers (web ${web_code}, api ${api_code})"
+else
+  warn "local check through Traefik: web ${web_code}, api ${api_code} — run this script with --diagnose for details"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

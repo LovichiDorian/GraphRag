@@ -129,10 +129,26 @@ jobs:
           ref="${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ steps.meta.outputs.version }}"
           docker buildx imagetools inspect "$ref"
           echo "digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r .digest)" >> "$GITHUB_OUTPUT"
-      - uses: sigstore/cosign-installer@v4
+      - name: Check that the cluster can pull the image anonymously
+        run: |
+          repo="${IMAGE_PREFIX#ghcr.io/}-${{ matrix.image }}"
+          token=$(curl -sf "https://ghcr.io/token?scope=repository:${repo}:pull" | jq -r '.token // empty' || true)
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+            -H 'Accept: application/vnd.oci.image.index.v1+json' "https://ghcr.io/v2/${repo}/manifests/latest")
+          if [[ "$code" == "200" ]]; then
+            echo "ghcr.io/${repo} is public"
+          else
+            msg="ghcr.io/${repo} is private (HTTP ${code}): make it public in the package settings so k3s can pull it — https://github.com/users/${GITHUB_REPOSITORY_OWNER}/packages/container/package/${repo#*/}"
+            echo "::warning::${msg}"
+            echo "- ${msg}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: sigstore/cosign-installer@v4.1.2
       - name: Sign with cosign (keyless, GitHub OIDC)
         run: cosign sign --yes "${{ env.IMAGE_PREFIX }}-${{ matrix.image }}@${{ steps.digest.outputs.digest }}"
+      # Scanning informs, it never blocks a deployment (e.g. when the Trivy DB is rate limited).
       - name: Trivy vulnerability scan
+        id: trivy
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}@${{ steps.digest.outputs.digest }}
@@ -142,7 +158,8 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
       - uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: steps.trivy.outcome == 'success'
+        continue-on-error: true
         with:
           sarif_file: trivy-${{ matrix.image }}.sarif
           category: trivy-${{ matrix.image }}
