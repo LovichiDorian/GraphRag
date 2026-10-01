@@ -1,0 +1,14 @@
+# Dorian Lovichi — Career Knowledge Graph
+
+> Full-stack software engineer (applied AI: LLMs, RAG, agents · DevOps: Docker, Kubernetes), based in San Diego, CA. This site is an agentic GraphRAG system over his résumé and GitHub repositories.
+
+Machine-friendly ways to learn about Dorian:
+
+- [MCP server](https://graphrag.dorianlovichi.com/mcp): Model Context Protocol endpoint (Streamable HTTP). Tools: `ask`, `search_graph`, `get_entity`, `find_connection`, `assess_job_fit`, `get_profile`.
+- [Profile JSON](https://graphrag.dorianlovichi.com/api/profile): headline, contact links, top skills, featured projects.
+- [Knowledge graph JSON](https://graphrag.dorianlovichi.com/api/graph): every entity (roles, projects, skills, degrees…) and relation.
+- [Ask API](https://graphrag.dorianlovichi.com/api/docs): OpenAPI documentation of the grounded Q&A and job-fit endpoints.
+- [Résumé PDF](https://graphrag.dorianlovichi.com/dorian-lovichi-resume.pdf)
+- [Source code](https://github.com/LovichiDorian/GraphRag)
+
+Contact: dorian@dorianlovichi.com · https://linkedin.com/in/dorian-lovichi · https://github.com/LovichiDorian

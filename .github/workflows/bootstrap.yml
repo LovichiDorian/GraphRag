@@ -1,0 +1,82 @@
+# One-click (re)install on the k3s server over SSH — handy from a phone.
+# Required repository secrets: SSH_PRIVATE_KEY, GEMINI_API_KEY.
+# Optional: GITHUB_READ_TOKEN (GitHub API limits), variables SSH_HOST / SSH_USER.
+name: Bootstrap cluster
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What to run on the server
+        type: choice
+        options: [gitops, local-build, diagnose]
+        default: gitops
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap
+  cancel-in-progress: false
+
+env:
+  DOMAIN: graphrag.dorianlovichi.com
+
+jobs:
+  install:
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      SSH_HOST: ${{ vars.SSH_HOST || '89.168.33.236' }}
+      SSH_USER: ${{ vars.SSH_USER || 'ubuntu' }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure SSH
+        id: configure
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$SSH_PRIVATE_KEY" ]]; then
+            echo "::error::Add the SSH_PRIVATE_KEY repository secret (a key allowed to SSH as $SSH_USER@$SSH_HOST)."
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" 'echo "connected to $(hostname) ($(uname -m))"'
+      - name: Run deploy/scripts/install.sh on the server
+        if: inputs.mode != 'diagnose'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_READ_TOKEN: ${{ secrets.GITHUB_READ_TOKEN }}
+        run: |
+          target="$SSH_USER@$SSH_HOST"
+          ssh_opts=(-i ~/.ssh/id_deploy -o BatchMode=yes -o ServerAliveInterval=30)
+          # Secrets travel over stdin into a 0600 file, never on a command line.
+          printf 'GEMINI_API_KEY=%s\nGITHUB_TOKEN=%s\n' "$GEMINI_API_KEY" "$GITHUB_READ_TOKEN" \
+            | ssh "${ssh_opts[@]}" "$target" 'umask 077; cat > /tmp/graphrag.env'
+          flag=""
+          [[ "${{ inputs.mode }}" == "local-build" ]] && flag="--local-build"
+          status=0
+          # shellcheck disable=SC2029 # $flag is meant to expand on the runner
+          ssh "${ssh_opts[@]}" "$target" "sudo ENV_FILE=/tmp/graphrag.env bash -s -- $flag" < deploy/scripts/install.sh || status=$?
+          ssh "${ssh_opts[@]}" "$target" 'rm -f /tmp/graphrag.env'
+          exit "$status"
+      - name: Cluster report
+        if: always() && steps.configure.outcome != 'failure'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$SSH_USER@$SSH_HOST" "sudo bash -s -- --diagnose" < deploy/scripts/install.sh || true
+      - name: Check the site from the internet
+        if: always()
+        run: |
+          report() { printf '| %s | `%s` |\n' "$1" "$2" | tee -a "$GITHUB_STEP_SUMMARY"; }
+          echo "| check | result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          report "DNS A record" "$(dig +short "$DOMAIN" A | tr '\n' ' ')"
+          report "http://$DOMAIN" "$(curl -s -o /dev/null -m 15 -w '%{http_code} → %{redirect_url}' "http://$DOMAIN/" || true)"
+          report "https://$DOMAIN" "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "https://$DOMAIN/" || echo 'TLS or connection error')"
+          report "https://$DOMAIN/api/stats" "$(curl -s -m 15 "https://$DOMAIN/api/stats" | head -c 160 || true)"
+          if [[ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "https://$DOMAIN/" || true)" != "200" ]]; then
+            echo "::warning::https://$DOMAIN is not serving yet. If http:// also times out, open ports 80/443 in the cloud firewall (Oracle Cloud: VCN security list)."
+          fi

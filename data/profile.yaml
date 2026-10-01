@@ -1,0 +1,249 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Career knowledge base — single source of truth for the graph.
+#
+# Edit this file and push: CI rebuilds the images, Argo CD syncs, and the
+# ingestion job re-extracts only what changed (content-addressed LLM cache).
+#
+# Rules: every statement here must be factual. The chatbot is instructed to
+# answer only from this file, the notes in data/notes and the GitHub repos.
+# ─────────────────────────────────────────────────────────────────────────────
+
+person:
+  id: dorian-lovichi
+  name: Dorian Lovichi
+  headline: Full-Stack Software Engineer | Applied AI (LLMs, RAG, Agents) & DevOps
+  location: San Diego, CA
+  email: dorian@dorianlovichi.com
+  website: https://dorianlovichi.com
+  linkedin: https://linkedin.com/in/dorian-lovichi
+  github: https://github.com/LovichiDorian
+  work_authorization: EU citizen; will require U.S. employment visa sponsorship
+  summary: >-
+    Full-stack software engineer with 2 years of production experience at GoodBarber, a SaaS
+    platform powering 30,000+ mobile apps and PWAs (Angular/TypeScript frontend, PHP/Phalcon
+    backend). Builds applied AI systems in parallel as a freelancer: RAG and GraphRAG pipelines,
+    multi-agent orchestration, and containerized deployments on Kubernetes. Winner of the
+    University of Corsica Innovation Challenge 2025.
+
+# Skill groups exactly as listed on the CV. Each group becomes a Domain node.
+skills:
+  Languages: [Python, TypeScript, JavaScript, PHP, SQL]
+  Applied AI:
+    - LangChain
+    - LLMs
+    - RAG
+    - GraphRAG
+    - AI agents
+    - Multi-agent orchestration
+    - Embeddings
+    - Vector search
+    - Prompt optimization
+  Frontend: [Angular, React, React Native, PWA, Nx monorepo]
+  Backend & Data: [FastAPI, Node.js, Express, Phalcon, REST APIs, PostgreSQL, MongoDB]
+  DevOps & Cloud: [Docker, Kubernetes, CI/CD, Nginx, Linux, Cloud architecture]
+  Practices: [Design patterns, Git, Code review, Agile/Scrum]
+
+experience:
+  - id: goodbarber
+    title: Software Engineer (Apprenticeship)
+    organization: GoodBarber
+    organization_description: SaaS platform for building native mobile apps and Progressive Web Apps
+    organization_url: https://www.goodbarber.com
+    location: Ajaccio, France
+    start: 2024-09
+    end: 2026-08
+    skills:
+      [PHP, Phalcon, REST APIs, Angular, TypeScript, Nx monorepo, PWA, CI/CD, Code review, Server-Driven UI]
+    highlights:
+      - >-
+        Architected a configuration-driven Server-Driven UI rendering layer and designed the
+        supporting REST endpoints in PHP (Phalcon), enabling layouts to ship without app
+        redeployment across 30,000+ platform-generated apps that record 25,000+ downloads per
+        day across 152 countries.
+      - >-
+        Developed frontend features in Angular/TypeScript within an Nx monorepo for the
+        platform's generated PWAs and its editor back-office, a product available in 16
+        languages and used by customers worldwide, with published apps localized in 33 languages.
+      - >-
+        Delivered features end to end, from specification to production release, through CI
+        pipelines, peer code reviews, and close collaboration with the product team on a
+        platform serving several apps with over a million users each.
+
+  - id: freelance
+    title: AI & Full-Stack Developer
+    organization: Freelance
+    organization_description: Independent AI and full-stack engineering practice
+    location: Ajaccio, France
+    start: 2026-02
+    end: null # present
+    skills: [Cloud architecture, Technical audit, Technical training, Web development, DNS & hosting]
+    highlights:
+      - >-
+        Delivered a client website end to end, from design and development to hosting, domain
+        setup, and ongoing support, for a drone services business
+        (aghjone-drone-zigliara.dorianlovichi.com).
+      - >-
+        Advised clients on cloud architecture, conducted technical audits of existing systems,
+        and delivered technical training.
+
+  - id: collectivite-de-corse
+    title: Application Developer (Internship)
+    organization: Collectivité de Corse
+    organization_description: Regional government of Corsica
+    location: Ajaccio, France
+    start: 2023-04
+    end: 2023-05
+    skills: []
+    highlights:
+      - >-
+        Built an application for the regional government of Corsica to help the public discover
+        the island's territory, independently owning the assigned scope.
+
+projects:
+  - id: agentic-graphrag
+    name: Agentic GraphRAG — Career Knowledge Graph
+    featured: true
+    url: https://graphrag.dorianlovichi.com
+    repo: GraphRag
+    period: 2026
+    skills:
+      [Python, FastAPI, GraphRAG, Knowledge graphs, Neo4j, Vector search, Embeddings, Gemini, AI agents,
+       Multi-agent orchestration, Model Context Protocol (MCP), Next.js, React, TypeScript, Three.js,
+       Kubernetes, k3s, Argo CD, GitOps, Docker, GitHub Actions, Traefik, cert-manager]
+    summary: >-
+      This very site. An agentic GraphRAG system that turns a CV and GitHub repositories into a
+      Neo4j knowledge graph and lets recruiters query it in natural language, with streamed,
+      cited answers and a live 3D view of the evidence subgraph.
+    highlights:
+      - >-
+        Ingestion pipeline: schema-guided LLM extraction (Gemini structured output), entity
+        resolution against a canonical technology ontology, dependency-manifest analysis of each
+        repository, Louvain community detection with LLM-written community reports, and
+        768-dimension Gemini embeddings stored in Neo4j vector indexes.
+      - >-
+        Retrieval: hybrid vector + full-text search fused with Reciprocal Rank Fusion, then
+        HippoRAG-style Personalized PageRank over the knowledge graph to pull in multi-hop
+        evidence; a planner agent can also generate guarded read-only Cypher.
+      - >-
+        Multi-agent orchestration (planner → retriever → synthesizer) with model fallback and
+        circuit breakers, streamed to the browser over the Vercel AI SDK UI message protocol;
+        job-description fit analyzer with evidence-backed scoring; MCP server so any AI
+        assistant can query the graph.
+      - >-
+        Deployed on a k3s cluster with Argo CD GitOps: multi-arch images (amd64/arm64) built by
+        GitHub Actions on native runners, signed with cosign, SBOM + provenance attestations,
+        Traefik ingress with rate limiting, cert-manager TLS, NetworkPolicies and a nightly
+        re-ingestion CronJob.
+
+  - id: precision-agriculture
+    name: Precision Agriculture Platform
+    featured: true
+    period: 2025
+    skills: [IoT, Satellite imagery, Drone data, Sensor data fusion, Real-time monitoring, Alerting]
+    summary: >-
+      Innovation Challenge Winner 2025 — a real-time crop monitoring solution fusing satellite
+      imagery, drone data, and field sensors.
+    highlights:
+      - >-
+        Designed a real-time crop monitoring solution fusing satellite imagery, drone data, and
+        field sensors to drive irrigation, disease prevention, and automated alerts; won the
+        University of Corsica Innovation Challenge 2025.
+
+  - id: dl-refine
+    name: DL-Refine — AI Chatbot with Prompt Optimization
+    featured: true
+    url: https://dl-refine.dorianlovichi.com
+    skills: [Node.js, Express, LLMs, Prompt optimization, Kubernetes, Docker]
+    summary: >-
+      Bilingual English/French chatbot with automatic prompt optimization and three modes
+      (expert, plain-language, translator).
+    highlights:
+      - >-
+        Built a bilingual English/French chatbot with automatic prompt optimization and three
+        modes (expert, plain-language, translator), containerized and deployed on Kubernetes.
+
+  - id: impa
+    name: IMPA — Internal Newsroom Tool (Hackathon)
+    url: https://impa.dorianlovichi.com
+    skills: [Kubernetes, Docker, Data modeling, UI design, Requirements gathering]
+    summary: Internal tool for a newspaper, shipped within a 2-day hackathon.
+    highlights:
+      - >-
+        Took an internal tool for a newspaper from requirements gathering through data
+        modeling, UI, and Kubernetes deployment, shipping a working product within a 2-day
+        hackathon.
+
+  - id: evergotrips
+    name: EverGoTrips — Travel App
+    url: https://evergotrips.dorianlovichi.com
+    skills: [React, React Native, PWA, REST APIs, Offline-first]
+    summary: Cross-platform travel app and PWA with an offline mode, backed by a dedicated REST API.
+    highlights:
+      - Developed a cross-platform travel app and PWA with an offline mode, backed by a dedicated REST API.
+
+  - id: aghjone-drone-zigliara
+    name: Aghjone Drone Zigliara — client website
+    url: https://aghjone-drone-zigliara.dorianlovichi.com
+    role: freelance
+    skills: [Web development, DNS & hosting]
+    summary: Client website for a drone services business, delivered end to end as a freelancer.
+    highlights:
+      - >-
+        Delivered end to end, from design and development to hosting, domain setup, and ongoing
+        support.
+
+education:
+  - id: msc-fullstack
+    degree: M.S., Full-Stack Web & Mobile Development
+    honors: High Honors
+    school: Università di Corsica
+    start: 2024
+    end: 2026
+  - id: bsc-engineering
+    degree: B.S., Engineering Science
+    honors: Honors
+    school: Università di Corsica
+    start: 2023
+    end: 2024
+  - id: associate-multimedia
+    degree: Associate Degree, Multimedia & Web Development
+    honors: Honors
+    school: Università di Corsica
+    start: 2021
+    end: 2023
+  - id: sdsu-immersion
+    degree: Academic & Language Immersion Program
+    school: San Diego State University
+    location: San Diego, CA
+    start: 2026
+    end: 2026
+    note: Fall 2026
+
+awards:
+  - id: innovation-challenge-2025
+    name: University of Corsica Innovation Challenge 2025 — Winner
+    organization: Università di Corsica
+    project: precision-agriculture
+    year: 2025
+
+languages:
+  - { name: French, level: Native }
+  - { name: English, level: Full professional proficiency (B2/C1) }
+  - { name: Corsican, level: Professional }
+  - { name: Spanish, level: Elementary }
+
+# GitHub ingestion. Public repositories of `user` are fetched at ingestion time
+# (README, docs, dependency manifests, languages, topics). Private repositories
+# are only ingested when GITHUB_INCLUDE_PRIVATE=true and a token is provided —
+# their content becomes public through the chatbot, so opt in deliberately.
+github:
+  user: LovichiDorian
+  exclude: [secret]
+  overrides:
+    GraphRag: { project: agentic-graphrag }
+    EverGoTrips: { project: evergotrips }
+    AIAgentTrend: { name: "Tech Watch Agent (AIAgentTrend)" }
+    DashboardAgentsAI: { name: "AI Agents Dashboard" }
+    MeteoAppAndroidKotlin: { name: "Weather App (Android, Kotlin)" }
+    chatAppFlutter: { name: "ChatApp (Flutter + Firebase)" }
+    Jeux_de_tirs_2020-2021: { name: "Shoot 'em up game (ActionScript, 2020–2021)" }
