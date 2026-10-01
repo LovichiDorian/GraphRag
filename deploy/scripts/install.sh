@@ -152,7 +152,9 @@ if command -v iptables >/dev/null 2>&1; then
     done
   fi
   if [[ -n "$changed" ]]; then
-    command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save >/dev/null 2>&1 || true
+    if command -v netfilter-persistent >/dev/null 2>&1; then
+      netfilter-persistent save >/dev/null 2>&1 || warn "could not persist the firewall rules"
+    fi
     ok "host firewall: opened 80/443 and pod forwarding (REJECT rules were present)"
   fi
 fi
