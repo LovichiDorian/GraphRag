@@ -1,0 +1,25 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# node
+node_modules/
+.next/
+*.tsbuildinfo
+apps/web/next-env.d.ts
+
+# misc
+.DS_Store
+.idea/
+.vscode/
+deploy/k8s/overlays/local/
