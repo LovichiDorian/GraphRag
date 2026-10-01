@@ -1,0 +1,73 @@
+[project]
+name = "careergraph"
+version = "1.0.0"
+description = "Agentic GraphRAG over Dorian Lovichi's CV and GitHub — FastAPI · Gemini · Neo4j · MCP"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "Dorian Lovichi", email = "dorian@dorianlovichi.com" }]
+dependencies = [
+    "fastapi>=0.142.2",
+    "uvicorn[standard]>=0.54.0",
+    "google-genai>=2.26.0",
+    "neo4j>=6.3.1",
+    "mcp>=2.2.0",
+    "numpy>=2.5.3",
+    "networkx>=3.7",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0.3",
+    "orjson>=3.12.0",
+    "structlog>=26.1.0",
+    "prometheus-client>=0.26.0",
+]
+
+[project.scripts]
+careergraph-api = "careergraph.api.main:run"
+careergraph-ingest = "careergraph.ingest.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.9",
+    "mypy>=2.3.1",
+    "types-pyyaml>=6.0.12",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "BLE", "SIM", "ASYNC", "RUF", "C4", "PIE", "PT", "RET", "TID", "PERF", "LOG", "G"]
+ignore = ["RUF001", "RUF002", "RUF003", "E501", "SIM905"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["careergraph"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["networkx.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning:google.genai.*"]
