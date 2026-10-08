@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.10
 # Build context: repository root (the image embeds data/ — the curated knowledge base).
 
-FROM ghcr.io/astral-sh/uv:0.12.21 AS uv
+FROM ghcr.io/astral-sh/uv:0.12.24 AS uv
 
 FROM python:3.14.7-slim AS build
 COPY --from=uv /uv /uvx /bin/
