@@ -3,7 +3,7 @@
 
 FROM ghcr.io/astral-sh/uv:0.12.21 AS uv
 
-FROM python:3.14.7-slim AS build
+FROM python:3.14.8-slim AS build
 COPY --from=uv /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY apps/api/ ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
 
-FROM python:3.14.7-slim AS runtime
+FROM python:3.14.8-slim AS runtime
 LABEL org.opencontainers.image.title="careergraph-api" \
       org.opencontainers.image.description="Agentic GraphRAG API + ingestion (FastAPI, Gemini, Neo4j, MCP)" \
       org.opencontainers.image.source="https://github.com/LovichiDorian/GraphRag" \
