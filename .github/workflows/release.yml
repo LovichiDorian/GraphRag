@@ -142,7 +142,7 @@ jobs:
             echo "::warning::${msg}"
             echo "- ${msg}" >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: sigstore/cosign-installer@v4.1.2
+      - uses: sigstore/cosign-installer@v4.1.3
       - name: Sign with cosign (keyless, GitHub OIDC)
         run: cosign sign --yes "${{ env.IMAGE_PREFIX }}-${{ matrix.image }}@${{ steps.digest.outputs.digest }}"
       # Scanning informs, it never blocks a deployment (e.g. when the Trivy DB is rate limited).
